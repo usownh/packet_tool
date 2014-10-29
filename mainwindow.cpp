@@ -132,7 +132,6 @@ void MainWindow::newPacketCaptured()
     ui->tableView->selectRow(packetNum);
     packetNum++;
 
-
 }
 
 void MainWindow::addPacket2Table(int selectNum)
