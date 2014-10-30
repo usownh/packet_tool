@@ -73,7 +73,9 @@ void Capture::run()
         currentPacket.setLength(header->len);
         currentPacket.time=QTime().fromString(QString(timestr),"hh:mm:ss");
         currentPacket.packetId=packetId++;
+        mutex->lock();
         packetList->append(currentPacket);
+        mutex->unlock();
         emit newPacket();
     }
     if(res == -1)

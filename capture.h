@@ -7,6 +7,7 @@
 #include <QList>
 #include <packet.h>
 #include <QByteArray>
+#include <QMutex>
 
 class Capture : public QThread
 {
@@ -15,6 +16,7 @@ public:
     explicit Capture(QObject *parent = 0);
     void setDevice(pcap_if_t *d);
     void setPacketList(QList<Packet> *p){p->clear();packetList=p;}
+    void setMutex(QMutex* m){mutex=m;}
 signals:
     void newPacket();
 public slots:
@@ -29,7 +31,7 @@ private:
     Packet currentPacket;
     int packetId;
     QString filterStr;
-    
+    QMutex *mutex;
 };
 
 #endif // CAPTURE_H

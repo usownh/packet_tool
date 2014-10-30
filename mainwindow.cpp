@@ -15,15 +15,14 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->textBrowser->setAcceptRichText(false);
     ui->pushButtonSearch->setDisabled(true);
 
-    packetNum=0;
     treeModel = new QStandardItemModel();
     ui->treeView->setModel(treeModel);
     ui->treeView->setHeaderHidden(true);
     tableModel = new QStandardItemModel();
     tableModel->setColumnCount(6);
     tableModel->setHeaderData(0,Qt::Horizontal,QString::fromLocal8Bit("编号"));
-    tableModel->setHeaderData(1,Qt::Horizontal,QString::fromLocal8Bit("时间"));
-    tableModel->setHeaderData(2,Qt::Horizontal,QString::fromLocal8Bit("源地址"));
+    tableModel->setHeaderData(1,Qt::Horizontal,QString::fromLocal8Bit("已抓数据包"));
+    tableModel->setHeaderData(2,Qt::Horizontal,QString::fromLocal8Bit("保存的请求包"));
     tableModel->setHeaderData(3,Qt::Horizontal,QString::fromLocal8Bit("目的地址"));
     tableModel->setHeaderData(4,Qt::Horizontal,QString::fromLocal8Bit("协议"));
     tableModel->setHeaderData(5,Qt::Horizontal,QString::fromLocal8Bit("信息"));
@@ -31,12 +30,15 @@ MainWindow::MainWindow(QWidget *parent) :
     //表头信息显示居左
     ui->tableView->horizontalHeader()->setDefaultAlignment(Qt::AlignHCenter);
     ui->tableView->setColumnWidth(0,50);
-    ui->tableView->setColumnWidth(1,100);
-    ui->tableView->setColumnWidth(2,150);
-    ui->tableView->setColumnWidth(3,150);
-    ui->tableView->setColumnWidth(4,100);
-    ui->tableView->setColumnWidth(5,300);
+    ui->tableView->setColumnWidth(1,300);
+    ui->tableView->setColumnWidth(2,300);
+    ui->tableView->setColumnWidth(3,10);
+    ui->tableView->setColumnWidth(4,10);
+    ui->tableView->setColumnWidth(5,10);
     ui->tableView->verticalHeader()->setVisible(false);
+    debug.setFileName("debug.txt");
+    mutex = new QMutex();
+    capThread.setMutex(mutex);
 }
 
 MainWindow::~MainWindow()
@@ -105,6 +107,17 @@ void MainWindow::on_pushButtonStartStop_clicked()
 {
     if(capThread.isRunning()==false)
     {
+        int i=0;
+        do
+        {
+            output.setFileName("data"+QString().setNum(i)+".txt");
+            i++;
+            qDebug()<<i;
+        }while(output.exists());
+        output.open(QIODevice::WriteOnly);
+//        debug.open(QIODevice::WriteOnly);
+        packetNum=0;
+        toFile=0;
         d=alldevs;
         for(int i=0;i<ui->comboBoxSelectDevice->currentIndex();i++) d=d->next;
         beforeCapOption.setDevice(d);
@@ -117,6 +130,9 @@ void MainWindow::on_pushButtonStartStop_clicked()
     else
     {
         capThread.terminate();
+        while(!newPacketList.isEmpty()) this->newPacketCaptured();
+        output.close();
+//        debug.close();
         ui->pushButtonStartStop->setText(tr("开始抓包"));
         ui->comboBoxSelectDevice->setEnabled(true);
         ui->pushButtonSearch->setEnabled(true);
@@ -126,12 +142,48 @@ void MainWindow::on_pushButtonStartStop_clicked()
 void MainWindow::newPacketCaptured()
 {
     //qDebug()<<newPacketList.first().ipVersion();
+//    qDebug()<<"new:"<<newPacketList.size();
+//    if(newPacketList.size()==0) return;
+    mutex->lock();
     packetList.append(newPacketList.first());
     newPacketList.removeFirst();
-    this->addPacket2Table(packetNum);
-    ui->tableView->selectRow(packetNum);
+    mutex->unlock();
+//    this->addPacket2Table(packetNum);
+    this->add2File();
+//    ui->tableView->selectRow(packetNum);
     packetNum++;
-
+    tableModel->setItem(0,1,new QStandardItem("packet captured:"+QString().setNum(packetNum)));
+}
+void MainWindow::add2File()
+{
+//    qDebug()<<"add2:"<<packetList.size();
+    currentPacket=packetList.first();
+    QString tmp;
+    if(currentPacket.protocolStr.contains("TCP"))
+    {
+        QString txt=QString(currentPacket.packet.mid(currentPacket.tcpendP,currentPacket.totalLength()-currentPacket.tcpendP));
+        if(txt.startsWith("GET")||txt.startsWith("POST"))
+        {
+            tmp=txt.mid(3,txt.indexOf("HTTP")-3);
+            if(txt.contains("Referer:"))
+            {
+                tmp=txt.mid(txt.indexOf("Referer:")+8,txt.indexOf("\n",txt.indexOf("Referer:"))-txt.indexOf("Referer:")-10)+tmp;
+            }
+            else
+            {
+                tmp=txt.mid(txt.indexOf("Host:")+5,txt.indexOf("\n",txt.indexOf("Host:"))-txt.indexOf("Host:")-5)+tmp;
+            }
+            toFile++;
+            tableModel->setItem(0,2,new QStandardItem("request packet saved:"+QString().setNum(toFile)));
+            tmp.remove("\n");
+            qDebug()<<tmp;
+            tmp.remove(" ");
+            tmp=currentPacket.srcIP().toString()+" "+currentPacket.time.toString()+" "+tmp;
+            output.write(tmp.toLocal8Bit()+"\n");
+//            debug.write("\n=========\n"+txt.toLocal8Bit());
+        }
+    }
+    packetList.removeFirst();
 }
 
 void MainWindow::addPacket2Table(int selectNum)

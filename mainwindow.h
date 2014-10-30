@@ -12,6 +12,8 @@
 #include <QHostAddress>
 #include <packet.h>
 #include <QStandardItemModel>
+#include <QFile>
+#include <QMutex>
 
 namespace Ui {
 class MainWindow;
@@ -29,6 +31,7 @@ public:
     void addPacket2Table(int selectNum);
     void addPacket2Tree(int selectNum);
     void addPacket2Text(int selectNum);
+    void add2File();
 public slots:
     void startCapture();
     void newPacketCaptured();
@@ -51,9 +54,11 @@ private:
     QList<Packet> newPacketList,packetList;
     Packet currentPacket;
     QStandardItemModel *tableModel,*treeModel;
-    int packetNum;
+    int packetNum,toFile;
     bool ok;
     Ui::MainWindow *ui;
+    QFile output,debug;
+    QMutex *mutex;
 };
 
 #endif // MAINWINDOW_H
