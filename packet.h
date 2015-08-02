@@ -6,7 +6,7 @@
 #include <QByteArray>
 #include <QString>
 #include <QHostAddress>
-
+typedef unsigned char uint8_t;
 class Packet
 {
 public:
